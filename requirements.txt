@@ -1,0 +1,5 @@
+aiogram
+telethon
+python-dotenv
+apscheduler
+aiohttp
