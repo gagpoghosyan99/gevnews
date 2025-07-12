@@ -1,5 +1,3 @@
-# src/main.py
-
 import os
 import asyncio
 
@@ -15,7 +13,7 @@ from aiohttp import ClientSession
 # ─── Load environment ──────────────────────────────────────────────────────────
 load_dotenv()
 API_ID       = int(os.getenv("TELEGRAM_API_ID"))
-API_HASH     = os.getenv("TELEGRAM_API_HASH"))
+API_HASH     = os.getenv("TELEGRAM_API_HASH")
 SESSION_STR  = os.getenv("TELETHON_SESSION")
 BOT_TOKEN    = os.getenv("BOT_TOKEN")
 CHANNEL_ID   = int(os.getenv("CHANNEL_ID"))
@@ -28,12 +26,11 @@ bot         = Bot(token=BOT_TOKEN)
 dp          = Dispatcher()
 scheduler   = AsyncIOScheduler()
 
-# ─── Helper for channel posts ──────────────────────────────────────────────────
+# ─── Helper for channel posts ─────────────────────────────────────────────────
 async def send_channel_message(text: str):
     await tele_client.send_message(CHANNEL_ID, text)
 
-# ─── Command handlers ─────────────────────────────────────────────────────────
-@dp.message.register(Command(commands=["start", "help"]))
+# ─── Handlers ─────────────────────────────────────────────────────────────────
 async def cmd_start_help(message: types.Message):
     await message.reply(
         "Բարև ձեզ!\n"
@@ -41,7 +38,6 @@ async def cmd_start_help(message: types.Message):
         "/testnotify  — Փորձարկել channel notification"
     )
 
-@dp.message.register(Command(commands=["latest"]))
 async def cmd_latest(message: types.Message):
     async with ClientSession() as session:
         url = (
@@ -55,7 +51,6 @@ async def cmd_latest(message: types.Message):
     await message.reply(text)
     await send_channel_message(f"📰 Թոփ նորություններ:\n{text}")
 
-@dp.message.register(Command(commands=["testnotify"]))
 async def cmd_testnotify(message: types.Message):
     await message.reply("📤 Ուղարկում եմ փորձնական հայտարարություն…")
     try:
@@ -63,6 +58,11 @@ async def cmd_testnotify(message: types.Message):
         await message.reply("✅ Հաջողվեց ուղարկել channel-ին։")
     except Exception as e:
         await message.reply(f"❌ Վերադարձավ սխալ՝ {e!r}")
+
+# ─── Register handlers ─────────────────────────────────────────────────────────
+dp.message.register(cmd_start_help,  Command(commands=["start", "help"]))
+dp.message.register(cmd_latest,      Command(commands=["latest"]))
+dp.message.register(cmd_testnotify,  Command(commands=["testnotify"]))
 
 # ─── Scheduled heartbeat ───────────────────────────────────────────────────────
 def schedule_jobs():
