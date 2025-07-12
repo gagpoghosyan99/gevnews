@@ -1,15 +1,13 @@
 import os
 import asyncio
-
 from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command
-from aiogram.fsm.strategy import FSMStrategy
-from aiogram.types import Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiohttp import ClientSession
 
@@ -25,8 +23,11 @@ NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 
 # ─── Initialize clients & scheduler ────────────────────────────────────────────
 tele_client = TelegramClient(StringSession(SESSION_STR), API_ID, API_HASH)
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher(fsm_strategy=FSMStrategy.CHAT)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
 # ─── Helper for channel posts ──────────────────────────────────────────────────
@@ -35,34 +36,35 @@ async def send_channel_message(text: str):
 
 # ─── Handlers ──────────────────────────────────────────────────────────────────
 @dp.message(Command(commands=["start", "help"]))
-async def cmd_start_help(message: Message):
-    await message.answer(
+async def cmd_start_help(message: types.Message):
+    await message.reply(
         "Բարև ձեզ!\n"
         "/latest      — Վերջին 5 նորություններ\n"
         "/testnotify  — Փորձարկել channel notification"
     )
 
 @dp.message(Command(commands=["latest"]))
-async def cmd_latest(message: Message):
+async def cmd_latest(message: types.Message):
     async with ClientSession() as session:
         url = (
-            f"https://newsapi.org/v2/top-headlines?apiKey={NEWSAPI_KEY}&language=en&pageSize=5"
+            f"https://newsapi.org/v2/top-headlines?"
+            f"apiKey={NEWSAPI_KEY}&language=en&pageSize=5"
         )
-        async with session.get(url) as resp:
-            data = await resp.json()
+        resp = await session.get(url)
+        data = await resp.json()
     titles = [f"• {a['title']}" for a in data.get("articles", [])]
     text = "📰 Վերջին նորություններ:\n" + ("\n".join(titles) or "Չկա տվյալ")
-    await message.answer(text)
+    await message.reply(text)
     await send_channel_message(f"📰 Թոփ նորություններ:\n{text}")
 
 @dp.message(Command(commands=["testnotify"]))
-async def cmd_testnotify(message: Message):
-    await message.answer("📤 Ուղարկում եմ փորձնական հայտարարություն…")
+async def cmd_testnotify(message: types.Message):
+    await message.reply("📤 Ուղարկում եմ փորձնական հայտարարություն…")
     try:
         await send_channel_message("✅ Channel notification is working!")
-        await message.answer("✅ Հաջողվեց ուղարկել channel-ին։")
+        await message.reply("✅ Հաջողվեց ուղարկել channel-ին։")
     except Exception as e:
-        await message.answer(f"❌ Վերադարձավ սխալ՝ {e!r}")
+        await message.reply(f"❌ Վերադարձավ սխալ՝ {e!r}")
 
 # ─── Scheduled heartbeat ───────────────────────────────────────────────────────
 def schedule_jobs():
@@ -74,11 +76,15 @@ def schedule_jobs():
     scheduler.start()
 
 # ─── Startup routine ────────────────────────────────────────────────────────────
-async def on_startup(bot: Bot) -> None:
+async def on_startup(bot: Bot):
     await tele_client.start(bot_token=BOT_TOKEN)
     schedule_jobs()
     await bot.send_message(OWNER_ID, "🤖 Bot is now online!")
 
 # ─── Entrypoint ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    dp.run_polling(bot=bot, on_startup=on_startup, skip_updates=True)
+    dp.run_polling(
+        bot,
+        on_startup=on_startup,
+        skip_updates=True
+    )
